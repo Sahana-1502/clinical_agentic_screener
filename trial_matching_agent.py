@@ -56,16 +56,17 @@ class MatchResult(BaseModel):
 
 class PatientExtractionAgent:
     def __init__(self):
-        # Initialize Google Gemini Pro (Free Tier)
+        # Initialize Google Gemini Pro
         self.llm = ChatGoogleGenerativeAI(model="gemini-pro", temperature=0)
 
     def extract_from_text(self, medical_text: str) -> PatientData:
+        # NOTICE: We use {{ }} for the JSON example to tell LangChain "this is text, not a variable"
         prompt_text = """
         Extract the following patient data from the text below into JSON format:
         - patient_id (string)
         - age (integer)
         - diagnosis (string)
-        - biomarkers (dictionary of floats, e.g. {"HbA1c": 8.2})
+        - biomarkers (dictionary of floats, e.g. {{"HbA1c": 8.2}})
         - medications (list of strings)
         - location (string)
 
