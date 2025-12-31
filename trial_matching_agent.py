@@ -57,8 +57,7 @@ class MatchResult(BaseModel):
 class PatientExtractionAgent:
     def __init__(self):
         # Initialize Google Gemini Pro
-        # The older, most compatible model version
-        self.llm = ChatGoogleGenerativeAI(model="gemini-1.0-pro", temperature=0)
+        self.llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0)
 
     def extract_from_text(self, medical_text: str) -> PatientData:
         # NOTICE: We use {{ }} for the JSON example to tell LangChain "this is text, not a variable"

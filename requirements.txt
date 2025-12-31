@@ -1,9 +1,10 @@
 streamlit
 pandas
-pydantic>=2.5.0
-langchain>=0.1.0
+pydantic
+langchain
 langchain-community
 langchain-core
-langchain-google-genai>=1.0.6
+langchain-google-genai
 python-dotenv
 pypdf
+google-generativeai
