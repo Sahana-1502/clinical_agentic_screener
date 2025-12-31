@@ -19,10 +19,12 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ===== DATA MODELS =====
+
 class PatientData(BaseModel):
     patient_id: str
     age: int
     diagnosis: str
+    # Biomarkers must be floats. The prompt ensures "160/95" becomes separate fields.
     biomarkers: Dict[str, float] = Field(default_factory=dict)
     medications: List[str] = Field(default_factory=list)
     location: str
@@ -56,13 +58,13 @@ class MatchResult(BaseModel):
 
 class PatientExtractionAgent:
     def __init__(self):
-        # Initialize Google Gemini Pro
+        # Using the specific 2.5 Flash model available in your list
         self.llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0)
 
-def extract_from_text(self, medical_text: str) -> PatientData:
+    def extract_from_text(self, medical_text: str) -> PatientData:
         prompt_text = """
         You are a medical data extractor. Extract patient data from the text below.
-        Return ONLY raw JSON. Do not use Markdown formatting.
+        Return ONLY raw JSON. Do not use Markdown formatting (no ```json).
         
         CRITICAL RULES FOR BIOMARKERS:
         - Values must be NUMBERS (floats) only.
@@ -94,16 +96,18 @@ def extract_from_text(self, medical_text: str) -> PatientData:
             # 3. Parse JSON manually
             result = json.loads(clean_content)
             
-            # 4. Add defaults
+            # 4. Add defaults if missing
             if "biomarkers" not in result: result["biomarkers"] = {}
             if "medications" not in result: result["medications"] = []
             
             return PatientData(**result)
             
         except Exception as e:
+            # Print error to terminal for debugging
             print(f"\n❌ FULL ERROR: {e}")
             print(f"❌ RAW AI OUTPUT: {raw_content if 'raw_content' in locals() else 'No output'}\n")
             
+            # Return error data so UI doesn't crash completely
             return PatientData(
                 patient_id="ERR", age=0, diagnosis=f"Failed: {str(e)[:50]}", location="Unknown"
             )
@@ -115,7 +119,7 @@ class TrialMatchingAgent:
         checks = 0
         passed = 0
 
-        # Logic 1: Diagnosis
+        # Logic 1: Diagnosis (Flexible string match)
         checks += 1
         if trial.condition.lower() in patient.diagnosis.lower():
             reasoning.append(f"✓ Diagnosis match: {patient.diagnosis}")
@@ -131,10 +135,9 @@ class TrialMatchingAgent:
         else:
             missing.append(f"Age {patient.age} outside {trial.age_min}-{trial.age_max}")
 
-        # Logic 3: Location (Updated for partial matching)
+        # Logic 3: Location (Smart substring match)
         checks += 1
-        # Check if any trial site (e.g. "Toronto") is inside the patient string (e.g. "Toronto, ON")
-        # specific logic: checks if "Toronto" is substring of "Toronto, ON"
+        # Checks if "Toronto" is inside "Toronto, ON"
         location_match = any(site.lower() in patient.location.lower() for site in trial.locations)
         
         if location_match:
@@ -143,7 +146,9 @@ class TrialMatchingAgent:
         else:
             missing.append(f"Location {patient.location} not in trial sites {trial.locations}")
 
+        # Calculate Score
         confidence = passed / checks if checks > 0 else 0
+        
         # STRICT MODE: Patient must match ALL criteria (100%) to be eligible
         decision = (confidence == 1.0)
 
