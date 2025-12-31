@@ -59,14 +59,21 @@ class PatientExtractionAgent:
         # Initialize Google Gemini Pro
         self.llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0)
 
-    def extract_from_text(self, medical_text: str) -> PatientData:
-        # NOTICE: We use {{ }} for the JSON example to tell LangChain "this is text, not a variable"
+def extract_from_text(self, medical_text: str) -> PatientData:
         prompt_text = """
-        Extract the following patient data from the text below into JSON format:
+        You are a medical data extractor. Extract patient data from the text below.
+        Return ONLY raw JSON. Do not use Markdown formatting.
+        
+        CRITICAL RULES FOR BIOMARKERS:
+        - Values must be NUMBERS (floats) only.
+        - DO NOT include fractions or strings like "120/80".
+        - If you see Blood Pressure (e.g. "160/95"), split it into two fields: "SystolicBP" (160) and "DiastolicBP" (95).
+        
+        Fields required:
         - patient_id (string)
         - age (integer)
         - diagnosis (string)
-        - biomarkers (dictionary of floats, e.g. {{"HbA1c": 8.2}})
+        - biomarkers (dictionary of floats)
         - medications (list of strings)
         - location (string)
 
@@ -74,19 +81,31 @@ class PatientExtractionAgent:
         {text}
         """
         prompt = ChatPromptTemplate.from_template(prompt_text)
-        chain = prompt | self.llm | JsonOutputParser()
+        chain = prompt | self.llm
         
         try:
-            result = chain.invoke({"text": medical_text})
-            # Add defaults if missing to pass validation
+            # 1. Get raw string response
+            response = chain.invoke({"text": medical_text})
+            raw_content = response.content
+            
+            # 2. Clean the cleanup (Remove markdown if Gemini adds it)
+            clean_content = raw_content.replace("```json", "").replace("```", "").strip()
+            
+            # 3. Parse JSON manually
+            result = json.loads(clean_content)
+            
+            # 4. Add defaults
             if "biomarkers" not in result: result["biomarkers"] = {}
             if "medications" not in result: result["medications"] = []
+            
             return PatientData(**result)
+            
         except Exception as e:
-            logger.error(f"Extraction failed: {e}")
-            # Fallback for demo if LLM fails
+            print(f"\n❌ FULL ERROR: {e}")
+            print(f"❌ RAW AI OUTPUT: {raw_content if 'raw_content' in locals() else 'No output'}\n")
+            
             return PatientData(
-                patient_id="ERR001", age=0, diagnosis="Error", location="Unknown"
+                patient_id="ERR", age=0, diagnosis=f"Failed: {str(e)[:50]}", location="Unknown"
             )
 
 class TrialMatchingAgent:
@@ -127,7 +146,7 @@ class TrialMatchingAgent:
         confidence = passed / checks if checks > 0 else 0
         # STRICT MODE: Patient must match ALL criteria (100%) to be eligible
         decision = (confidence == 1.0)
-        
+
         return MatchResult(
             patient_id=patient.patient_id,
             trial_id=trial.trial_id,
