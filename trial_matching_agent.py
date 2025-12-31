@@ -112,16 +112,17 @@ class TrialMatchingAgent:
         else:
             missing.append(f"Age {patient.age} outside {trial.age_min}-{trial.age_max}")
 
-        # Logic 3: Location
+        # Logic 3: Location (Updated for partial matching)
         checks += 1
-        if patient.location in trial.locations:
+        # Check if any trial site (e.g. "Toronto") is inside the patient string (e.g. "Toronto, ON")
+        # specific logic: checks if "Toronto" is substring of "Toronto, ON"
+        location_match = any(site.lower() in patient.location.lower() for site in trial.locations)
+        
+        if location_match:
             reasoning.append(f"✓ Location match: {patient.location}")
             passed += 1
         else:
-            missing.append(f"Location {patient.location} not in trial sites")
-
-        confidence = passed / checks if checks > 0 else 0
-        decision = confidence >= 0.66 # Simple threshold
+            missing.append(f"Location {patient.location} not in trial sites {trial.locations}")
 
         return MatchResult(
             patient_id=patient.patient_id,
