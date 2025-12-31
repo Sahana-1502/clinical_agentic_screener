@@ -124,6 +124,9 @@ class TrialMatchingAgent:
         else:
             missing.append(f"Location {patient.location} not in trial sites {trial.locations}")
 
+        confidence = passed / checks if checks > 0 else 0
+        decision = confidence >= 0.66 # Simple threshold
+
         return MatchResult(
             patient_id=patient.patient_id,
             trial_id=trial.trial_id,
