@@ -125,8 +125,9 @@ class TrialMatchingAgent:
             missing.append(f"Location {patient.location} not in trial sites {trial.locations}")
 
         confidence = passed / checks if checks > 0 else 0
-        decision = confidence >= 0.66 # Simple threshold
-
+        # STRICT MODE: Patient must match ALL criteria (100%) to be eligible
+        decision = (confidence == 1.0)
+        
         return MatchResult(
             patient_id=patient.patient_id,
             trial_id=trial.trial_id,
